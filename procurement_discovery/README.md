@@ -6,7 +6,7 @@ sole-source "only vendor" justifications, bridge extensions), and the thing
 being bought is software-shaped, a small team with modern AI tooling may be able
 to supply it at a cost structure incumbents can't match.
 
-Findings: [`reports/findings.md`](reports/findings.md) (broad pass) and [`reports/easy_builds.md`](reports/easy_builds.md) (small-ticket, no-PHI, easy-to-build pass).
+Findings: [`reports/findings.md`](reports/findings.md) (broad pass) and [`reports/easy_builds.md`](reports/easy_builds.md) (small-ticket, no-PHI, easy-to-build pass). Case study: [`reports/mndot_clear_roads_asswmd.md`](reports/mndot_clear_roads_asswmd.md).
 
 ## Pipeline
 
@@ -17,6 +17,7 @@ Findings: [`reports/findings.md`](reports/findings.md) (broad pass) and [`report
 | 1. Signal harvest (state, manual) | CMS-approved state plan amendments (RAC exemptions), GAO/MACPAC/NASEM reports, TN Fiscal Review sole-source filings | cited in `data/opportunities.csv` |
 | 2. Buildability filter | Keyword tagger: failure-signal type + software-buildable vs. excluded (staffing, facilities, clinical, hardware, giant SI) | `engine/classify.py`, `engine/rank_ny.py`, `engine/analyze_federal.py` |
 | 3–5. Normalize, test gap, count repetition | Hand-normalized problem statements with mandate, failure evidence, gap type, incumbents, # jurisdictions with evidence vs. addressable | `data/opportunities.csv` |
+| 1. Signal harvest (state, bid counts) | MnDOT P/T "Responses Received" sheet (responder names for every solicitation) and a watcher that flags open spreadsheet→web-tool listings | `engine/mndot_responders.py`, `engine/mndot_notices_watch.py` → `data/mndot_pt_responders.*` |
 | 2b. Easy-build pass | Drops PHI-touching and integration-heavy work, keeps one-offer/sole-source awards, groups by recurring need | `engine/easy_builds.py` → `data/easy_builds*.csv` |
 | 6. Score & size | Weighted score (demand 25%, gap realness 25%, repetition 20%, buildability 15%, sweet-spot size 15%); gate removes competitive markets; spend = jurisdictions × annual contract band | `engine/score_opportunities.py` → `data/opportunities_scored.csv` |
 
@@ -31,6 +32,7 @@ python3 engine/easy_builds.py data/federal_awards_small.csv data/federal_awards.
 python3 engine/ny_single_source.py data/ny_doh_single_source.csv # site rate-limits; reruns may 403
 python3 engine/rank_ny.py
 python3 engine/score_opportunities.py
+python3 engine/mndot_responders.py && python3 engine/mndot_notices_watch.py   # weekly
 ```
 
 ## Known limits
