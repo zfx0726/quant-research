@@ -57,3 +57,13 @@ Scanning 104 CivicPlus city/county bid pages (`engine/civicengage_scan.py`) foun
 | **Rural ambulance services**: 63% of Minnesota's 266 licensed services are volunteer or mixed paid/volunteer (OEMS) | Direct quotes under $25k; state staffing grants (AST&S) | Shift/on-call coverage scheduling. This is the same need the federal data showed bought 73 times with weak competition. Staff rosters, no PHI. **Pairs with getting EMT-certified and running calls: clinical hours plus a service story** | Direct sale; no RFP needed |
 | **Synar tobacco-retailer compliance tooling** (Minnesota DHS) | Small, annual federal requirement | Youth-access prevention. Retailer list plus inspection sampling | Watch DHS for contracts |
 | **Local public-health data work** (community health assessments) | Small | Population health. Note that MDH moved county health statistics to its own dashboard in 2026, which reduces this need | Direct / partner |
+
+### Reality check on the health-aligned options (verified 28 Sep 2026)
+
+| Option | Money actually there? | Can you apply? | Realistic odds for a software builder |
+|---|---|---|---|
+| Carver County opioid settlement | Up to $250k pool for 2027, due ~16 Oct. But the county's jail medication-treatment (MOUD) program was projected at about **$170k for 2026** and the board is weighing funding it from settlement dollars, so little is likely left for new projects | **No as a business.** Eligible applicants are nonprofits, community and faith groups, schools, health care providers, local governments and treatment providers | Low. Past awards went to direct services (jail MOUD, youth recovery, housing support, fentanyl test strips) |
+| Meeker County | ~$854k over 18 years (~$47k/yr); RFP releases 1 Oct | TBD in the RFP | Low–moderate, and only as a partner on a service project |
+| Horizon Public Health (Stevens, Pope, Douglas, Grant, Traverse) | 2026 round **closed 15 Jun 2026** | Nonprofits, providers, schools, governments, faith-based and community groups | Wait for 2027 |
+| Steele County | ~$1.5M over 18 years (~$83k/yr); RFP opens **fall 2026** for 2027 | **Yes: for-profits and businesses are explicitly eligible** | Best of the opioid options. Still, reviewers prioritize measurable health outcomes over tools |
+| Rural ambulance scheduling | Services are cash-strapped; state AST&S grants pay for EMT training, not software | Direct sale | **Low as a business.** Aladtec (Hudson, WI) already serves 1,000+ EMS/fire agencies, including many volunteer services. The federal one-bid signal was VA-specific lock-in, not a rural EMS gap |
