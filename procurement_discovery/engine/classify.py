@@ -40,3 +40,13 @@ def score(sig, buildable_hits, exclude_hits, giant):
     s += min(buildable_hits, 6) - 2 * min(exclude_hits, 4)
     s -= 2 * giant
     return s
+
+# Data-sensitivity axis: does delivering this require touching protected health information?
+PHI = r"patient|clinical|medical record|\bEHR\b|\bEMR\b|electronic health record|claims?\b|enrollee|beneficiar|member (?:data|records)|recipient data|eligibility|case management|immuniz|screening|lab(?:oratory)? results|diagnos|treatment|prescription|HIV|STD|STI|hepatitis|surveillance|registry|vital records|death|birth|newborn|behavioral health records|substance use disorder|PHI|HIPAA|42 CFR part 2"
+NON_PHI = r"website|web ?site|webcast|livestream|meeting|minutes|training|learning management|\bLMS\b|e-?learning|grant|survey of (?:providers|facilities|retailers)|licens|inventory|asset|facility (?:data|inspection)|public reporting|dashboard|publication|directory|\bGIS\b|mapping|translation|accessib|508|alternate format|document (?:conversion|remediation)|procurement|contract management|workforce|scheduling|room|event|conference|library|archive|social media|content management|communications|public (?:data|information)|rate|fee schedule|price transparency|tobacco retailer|environmental health|water|food service establishment"
+
+
+def phi_risk(text):
+    """Return (phi_hits, non_phi_hits); rank low-PHI work first."""
+    t = text or ""
+    return len(re.findall(PHI, t, re.I)), len(re.findall(NON_PHI, t, re.I))

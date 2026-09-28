@@ -8,7 +8,7 @@ a CSV. Signals of interest:
   * not competed, "only one source"              -> "sole_source"
   * fair-opportunity exception on a task order   -> "fair_opp_exception"
 
-Usage: python engine/federal_usaspending.py data/federal_awards.csv
+Usage: python engine/federal_usaspending.py data/federal_awards.csv [lower_usd upper_usd]
 """
 import csv
 import json
@@ -131,6 +131,8 @@ def enrich(a):
 
 
 def main(out):
+    if len(sys.argv) > 3:
+        BAND.update(lower_bound=float(sys.argv[2]), upper_bound=float(sys.argv[3]))
     awards = list_awards()
     print(f"enriching {len(awards)} awards", file=sys.stderr)
     rows = []
