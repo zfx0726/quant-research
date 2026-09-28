@@ -28,3 +28,23 @@ Sources checked:
 2. **Legacy-grant-funded digital history projects.** The Minnesota Historical and Cultural Heritage grants fund hundreds of small projects a year, many of them tours, maps or websites. The consultant is often picked before or during the grant application, so the cheapest channel is historical societies and heritage preservation commissions ahead of grant deadlines, not RFP boards.
 3. **Pooled-fund Excel tools** (Clear Roads and similar programs run through MnDOT's notices page). `engine/mndot_notices_watch.py` covers these.
 4. **Small-organization elections** (retirement-association boards, commodity councils): recurring, rules-driven, and served by a few niche vendors.
+
+## Filter: eligible + likely to win + easy to build (added 28 Sep 2026)
+
+This assumes a small new vendor with no DOT prequalification, no FedRAMP, and no references from past government work. On that basis only **Afton's Interactive Map Technology Consultant RFP** passes all three tests among open solicitations:
+
+- **Eligible:** no prequalification, license, minimum firm size or insurance requirement is stated. Email submission to JMoore@aftonmn.gov by 12 Oct, 2 pm.
+- **Winnable:**
+  - Probably few bidders.
+  - The scope is 20 fixed sites that are already public (historicplace.org/afton), and the source material is digitized: the 1901 *Plat Book of Washington County* is on the Minnesota Digital Library, and the Borchert Map Library indexes Washington County plats.
+  - A working demo of the Old Village map attached to the proposal should outscore any narrative.
+- **Easy:** georeference 1–2 historic plats, lay them over a modern basemap in MapLibre or Leaflet with an opacity slider, add 10 markers per tour with text, photos and audio (recorded, or text-to-speech as fallback), and host it as a static site.
+- **Watch-outs:**
+  - The work is contingent on grant funding.
+  - At least 10 on-site photos in Valley Creek are required.
+  - It means meetings with the Heritage Preservation Commission.
+  - Budget is likely under $10–15k.
+
+Scanning 104 CivicPlus city/county bid pages (`engine/civicengage_scan.py`) found no other open software-shaped RFPs. Small Minnesota buyers mostly don't run RFPs for this size of work. Under Minn. Stat. 471.345, contracts of **$25,000 or less may be made by quotation or on the open market**, so the scalable path is direct quotes, not RFP boards:
+
+- **MNHS Legacy small grants** (up to $20k, quarterly). Recent digital awards include Lyon County HS "Find Your Veteran Website Registry" ($7,500), Carleton audio tours ($5,360) and Hennepin History Museum digitization ($11,150). The next small-grant deadline is reportedly **9 Oct 2026**; confirm it on MNHS's deadlines page. Approach historical societies and heritage preservation commissions now to be the named vendor, with a quote under $20k, in their applications. Consultant rates are capped at about $95.74/hour.
