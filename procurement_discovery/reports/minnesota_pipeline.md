@@ -48,3 +48,12 @@ This assumes a small new vendor with no DOT prequalification, no FedRAMP, and no
 Scanning 104 CivicPlus city/county bid pages (`engine/civicengage_scan.py`) found no other open software-shaped RFPs. Small Minnesota buyers mostly don't run RFPs for this size of work. Under Minn. Stat. 471.345, contracts of **$25,000 or less may be made by quotation or on the open market**, so the scalable path is direct quotes, not RFP boards:
 
 - **MNHS Legacy small grants** (up to $20k, quarterly). Recent digital awards include Lyon County HS "Find Your Veteran Website Registry" ($7,500), Carleton audio tours ($5,360) and Hennepin History Museum digitization ($11,150). The next small-grant deadline is reportedly **9 Oct 2026**; confirm it on MNHS's deadlines page. Approach historical societies and heritage preservation commissions now to be the named vendor, with a quote under $20k, in their applications. Consultant rates are capped at about $95.74/hour.
+
+## Health-aligned options (for a pre-med builder)
+
+| Option | Money / timing | Why it fits | Eligibility note |
+|---|---|---|---|
+| **County opioid-settlement funding**: Carver (up to $250k total pool, due **16 Oct 2026**), Meeker (RFP releases **1 Oct**), Stevens (rolling, $60k first round; lists "research and data collection"), Koochiching | Grant-style, local, recurring for 18 years | Build a naloxone-access / treatment-resource finder plus a county overdose-trend dashboard from public MDH data. No PHI, easy build, direct public-health impact | Applicants are usually community organizations, providers or schools. **Apply with a local nonprofit, clinic or public-health partner as the lead**; confirm whether for-profits can apply |
+| **Rural ambulance services**: 63% of Minnesota's 266 licensed services are volunteer or mixed paid/volunteer (OEMS) | Direct quotes under $25k; state staffing grants (AST&S) | Shift/on-call coverage scheduling. This is the same need the federal data showed bought 73 times with weak competition. Staff rosters, no PHI. **Pairs with getting EMT-certified and running calls: clinical hours plus a service story** | Direct sale; no RFP needed |
+| **Synar tobacco-retailer compliance tooling** (Minnesota DHS) | Small, annual federal requirement | Youth-access prevention. Retailer list plus inspection sampling | Watch DHS for contracts |
+| **Local public-health data work** (community health assessments) | Small | Population health. Note that MDH moved county health statistics to its own dashboard in 2026, which reduces this need | Direct / partner |
