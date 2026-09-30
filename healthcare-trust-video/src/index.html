@@ -1,0 +1,718 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Simple Enough to Trust</title>
+<style>
+  @font-face { font-family: Inter; src: url(fonts/Inter-400.ttf); font-weight: 400; }
+  @font-face { font-family: Inter; src: url(fonts/Inter-500.ttf); font-weight: 500; }
+  @font-face { font-family: Inter; src: url(fonts/Inter-600.ttf); font-weight: 600; }
+  @font-face { font-family: Inter; src: url(fonts/Inter-700.ttf); font-weight: 700; }
+  @font-face { font-family: Inter; src: url(fonts/Inter-800.ttf); font-weight: 800; }
+  @font-face { font-family: Fraunces; src: url(fonts/Fraunces-600.ttf); font-weight: 600; }
+  @font-face { font-family: Fraunces; src: url(fonts/Fraunces-700.ttf); font-weight: 700; }
+  @font-face { font-family: Mono; src: url(fonts/Mono-400.ttf); font-weight: 400; }
+  @font-face { font-family: Mono; src: url(fonts/Mono-600.ttf); font-weight: 600; }
+  html, body { margin: 0; background: #000; }
+  canvas { display: block; width: 1920px; height: 1080px; }
+</style>
+<script src="timing.js"></script>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+/* ============================================================
+   "Simple Enough to Trust" — 60s explainer, rendered frame-by-frame.
+   render(t) is a pure function of time t (seconds), so the capture
+   script can step through it deterministically at any frame rate.
+   ============================================================ */
+const W = 1920, H = 1080;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ---------- palette ----------
+const C = {
+  night: '#0D1220', night2: '#151C2E', nightLine: '#27314A',
+  paper: '#F4EFE6', paper2: '#EAE3D6', paperLine: '#D8CFBF',
+  ink: '#111827', inkSoft: '#4B5563', fog: '#8A93A6', fogLight: '#C9CFDA',
+  red: '#FF5A4E', redDeep: '#D93A2F', amber: '#FFB547',
+  teal: '#14B89C', tealDeep: '#0B8C77', blue: '#4C7DFF',
+};
+
+// ---------- math / easing ----------
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = k => 1 - Math.pow(1 - k, 3);
+const eIn = k => k * k * k;
+const eIO = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eBack = k => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+const eElastic = k => k === 0 || k === 1 ? k : Math.pow(2, -10 * k) * Math.sin((k * 10 - .75) * (2 * Math.PI / 3)) + 1;
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function hex2rgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function mix(a, b, k) { const A = hex2rgb(a), B = hex2rgb(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`; }
+
+// ---------- timeline helpers ----------
+const SC = {}; TIMING.scenes.forEach((s, i) => { s.i = i; SC[s.id] = s; });
+const TXT = {}; // filled from caps
+TIMING.scenes.forEach(s => TXT[s.id] = s.caps.map(c => c[2]).join(' '));
+// time at which a phrase is spoken (character-proportional estimate)
+function wt(id, sub) {
+  const s = SC[id], txt = TXT[id], i = txt.indexOf(sub);
+  if (i < 0) throw new Error('phrase not found: ' + sub);
+  return s.start + s.dur * i / txt.length;
+}
+const LEAD = 0.25;
+function win(id) {
+  const s = SC[id], nx = TIMING.scenes[s.i + 1];
+  return [s.i === 0 ? 0 : s.start - LEAD, nx ? nx.start - LEAD : TIMING.total];
+}
+
+// ---------- drawing primitives ----------
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function font(size, weight = 500, fam = 'Inter') { return `${weight} ${size}px ${fam}`; }
+function text(s, x, y, o = {}) {
+  ctx.save();
+  ctx.font = font(o.size || 32, o.weight || 500, o.fam || 'Inter');
+  ctx.fillStyle = o.color || C.paper;
+  ctx.textAlign = o.align || 'left';
+  ctx.textBaseline = o.base || 'alphabetic';
+  if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
+  if (o.ls) ctx.letterSpacing = o.ls + 'px';
+  ctx.fillText(s, x, y);
+  const w = ctx.measureText(s).width;
+  ctx.restore();
+  return w;
+}
+function measure(s, size, weight = 500, fam = 'Inter', ls = 0) {
+  ctx.save(); ctx.font = font(size, weight, fam); if (ls) ctx.letterSpacing = ls + 'px';
+  const w = ctx.measureText(s).width; ctx.restore(); return w;
+}
+function wrap(s, maxW, size, weight = 500, fam = 'Inter') {
+  const words = s.split(' '), lines = []; let cur = '';
+  for (const w of words) {
+    const tryL = cur ? cur + ' ' + w : w;
+    if (measure(tryL, size, weight, fam) > maxW && cur) { lines.push(cur); cur = w; } else cur = tryL;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+// text that rises in word-by-word
+function riseText(s, x, y, k, o = {}) {
+  const words = s.split(' '); let cx = x;
+  const size = o.size || 32, space = measure(' ', size, o.weight || 500, o.fam || 'Inter');
+  if (o.align === 'center') cx = x - measure(s, size, o.weight || 500, o.fam || 'Inter') / 2;
+  words.forEach((w, i) => {
+    const kk = eOut(clamp(k * (words.length * .35 + 1) - i * .35));
+    const ww = text(w, cx, y + (1 - kk) * size * .6, { ...o, align: 'left', alpha: (o.alpha ?? 1) * kk });
+    cx += ww + space;
+  });
+}
+function withAlpha(a, fn) { ctx.save(); ctx.globalAlpha *= clamp(a); fn(); ctx.restore(); }
+function tr(x, y, rot, sc, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.scale(sc ?? 1, sc ?? 1); fn(); ctx.restore(); }
+function shadow(blur, oy, col = 'rgba(0,0,0,.35)') { ctx.shadowColor = col; ctx.shadowBlur = blur; ctx.shadowOffsetY = oy; }
+function noShadow() { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; }
+
+function checkMark(x, y, s, k, col, lw = 6) {
+  if (k <= 0) return;
+  const pts = [[-.45, 0], [-.12, .32], [.5, -.35]];
+  const L1 = Math.hypot(.33, .32), L2 = Math.hypot(.62, .67), tot = L1 + L2;
+  let d = k * tot;
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x + pts[0][0] * s, y + pts[0][1] * s);
+  const a = Math.min(d, L1) / L1; ctx.lineTo(x + lerp(pts[0][0], pts[1][0], a) * s, y + lerp(pts[0][1], pts[1][1], a) * s);
+  if (d > L1) { const b = (d - L1) / L2; ctx.lineTo(x + lerp(pts[1][0], pts[2][0], b) * s, y + lerp(pts[1][1], pts[2][1], b) * s); }
+  ctx.stroke(); ctx.restore();
+}
+function stamp(label, x, y, rot, sc, col, size = 44) {
+  tr(x, y, rot, sc, () => {
+    ctx.font = font(size, 800); ctx.letterSpacing = '3px';
+    const w = ctx.measureText(label).width + 44, h = size + 30;
+    ctx.fillStyle = 'rgba(244,239,230,.92)'; rr(-w / 2, -h / 2, w, h, 10); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 6; rr(-w / 2, -h / 2, w, h, 10); ctx.stroke();
+    ctx.lineWidth = 2; rr(-w / 2 + 8, -h / 2 + 8, w - 16, h - 16, 6); ctx.stroke();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 3);
+  });
+}
+
+// ---------- props ----------
+function envelope(x, y, rot, label, col) {
+  tr(x, y, rot, 1, () => {
+    shadow(30, 14);
+    ctx.fillStyle = C.paper; rr(-180, -110, 360, 220, 10); ctx.fill(); noShadow();
+    ctx.strokeStyle = C.paperLine; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-180, -100); ctx.lineTo(0, 20); ctx.lineTo(180, -100); ctx.stroke();
+    ctx.fillStyle = C.paper2; rr(-150, 30, 170, 48, 6); ctx.fill();
+    ctx.fillStyle = C.fogLight; for (let i = 0; i < 3; i++) { rr(-140, 38 + i * 13, 120 - i * 25, 6, 3); ctx.fill(); }
+    ctx.save(); ctx.translate(95, 52); ctx.rotate(-.12);
+    ctx.font = font(18, 800); ctx.letterSpacing = '1.5px';
+    const w = ctx.measureText(label).width + 20;
+    ctx.strokeStyle = col; ctx.lineWidth = 3; rr(-w / 2, -16, w, 32, 4); ctx.stroke();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 1);
+    ctx.restore();
+  });
+}
+// a messy medical bill
+function billDoc(x, y, rot, sc, d) {
+  tr(x, y, rot, sc, () => {
+    const w = 380, h = 520;
+    shadow(40, 18);
+    ctx.fillStyle = C.paper; rr(-w / 2, -h / 2, w, h, 8); ctx.fill(); noShadow();
+    ctx.fillStyle = d.col; rr(-w / 2, -h / 2, w, 70, [8, 8, 0, 0]); ctx.fill();
+    text(d.head, -w / 2 + 22, -h / 2 + 32, { size: 17, weight: 800, color: '#fff', ls: 1.5 });
+    text(d.sub, -w / 2 + 22, -h / 2 + 55, { size: 14, weight: 500, color: 'rgba(255,255,255,.8)' });
+    let yy = -h / 2 + 108;
+    d.lines.forEach(([a, b]) => {
+      text(a, -w / 2 + 22, yy, { size: 15, fam: 'Mono', color: C.inkSoft });
+      text(b, w / 2 - 22, yy, { size: 15, fam: 'Mono', color: C.ink, align: 'right' });
+      yy += 30;
+    });
+    ctx.fillStyle = C.paperLine; ctx.fillRect(-w / 2 + 22, h / 2 - 118, w - 44, 2);
+    text(d.dueLabel, -w / 2 + 22, h / 2 - 78, { size: 16, weight: 600, color: C.inkSoft });
+    text(d.due, -w / 2 + 22, h / 2 - 34, { size: 40, weight: 800, color: C.ink });
+  });
+}
+const BILLS = [
+  { head: 'COUNTY GENERAL HOSPITAL', sub: 'Statement · Acct 88-40213-7', col: '#3A4A6B', dueLabel: 'PATIENT BALANCE DUE', due: '$4,812.00',
+    lines: [['REV 0450 ER LVL5', '$3,120.00'], ['REV 0350 CT SCAN', '$2,480.50'], ['REV 0250 PHARMACY', '$212.75'], ['ADJ CO-45', '−$2,104.25'], ['PR-1 DEDUCTIBLE', '$1,500.00'], ['PR-2 COINSURANCE', '$603.00'], ['FAC FEE (SITE)', '$1,000.00']] },
+  { head: 'PHYSICIAN GROUP', sub: 'Invoice · Provider NPI 1629…', col: '#6B4A7A', dueLabel: 'AMOUNT DUE', due: '$1,245.00',
+    lines: [['CPT 99285-25', '$1,410.00'], ['CPT 70450-26', '$386.00'], ['MOD -25 / -26', '—'], ['PAYER ADJ', '−$551.00'], ['OUT-OF-NTWK?', 'PENDING'], ['BAL BILL', '$0.00*'], ['*SEE REVERSE', '']] },
+  { head: 'LAB SERVICES INC.', sub: 'Invoice · Req # L-5520-XQ', col: '#7A5A2E', dueLabel: 'PLEASE PAY', due: '$389.17',
+    lines: [['CPT 80053 CMP', '$148.00'], ['CPT 85025 CBC', '$96.00'], ['CPT 84484 TROP', '$231.40'], ['CPT 36415 DRAW', '$34.00'], ['ALLOWED AMT', '$120.23'], ['DENIED: CO-197', '$389.17'], ['AUTH REQ\'D', 'Y']] },
+  { head: 'YOUR HEALTH PLAN', sub: 'Explanation of Benefits', col: '#2F6B64', dueLabel: 'AMOUNT YOU MAY OWE', due: '$ ? ? ?',
+    lines: [['CLAIM 24-0917-A', 'PROCESSED'], ['BILLED', '$7,209.25'], ['ALLOWED', '$3,487.11'], ['PLAN PAID', '$1,384.11'], ['NOT COVERED', 'SEE CODE 4'], ['REMARK N130', '—'], ['REMARK MA01', '—']] },
+];
+
+// ============================================================
+//   SCENES
+// ============================================================
+
+// ---- s1: the envelopes arrive ----
+function sceneS1(t) {
+  const tHead = 0.25, tEnv = wt('s1', 'Then');
+  riseText('You got care.', 150, 470, seg(t, tHead, tHead + .7), { size: 104, weight: 700, fam: 'Fraunces', color: C.paper });
+  riseText('Then came the envelopes.', 150, 600, seg(t, tEnv, tEnv + .8), { size: 64, weight: 600, fam: 'Fraunces', color: C.red });
+  const labels = ['STATEMENT', 'PAST DUE', 'INVOICE', 'FINAL NOTICE', 'EOB', 'BALANCE DUE', 'ACTION REQUIRED'];
+  const r = rng(7);
+  for (let i = 0; i < 7; i++) {
+    const t0 = tEnv + .1 + i * .13, k = seg(t, t0, t0 + .55);
+    if (k <= 0) continue;
+    const px = 1380 + (r() - .5) * 360, py = 560 + (r() - .5) * 300, rot = (r() - .5) * .6;
+    const y = lerp(-260, py, eBack(k));
+    envelope(px, y, rot * eOut(k) + (1 - k) * .8, labels[i], i % 2 ? C.red : C.redDeep);
+  }
+}
+
+// ---- s2: four bills, zero answers ----
+function sceneS2(t, a, b) {
+  const beats = [wt('s2', 'A hospital'), wt('s2', 'A doctor'), wt('s2', 'A lab'), wt('s2', 'And a letter')];
+  const tStamp = wt('s2', 'this is not') + .15;
+  const shake = t > tStamp ? Math.exp(-(t - tStamp) * 9) * 14 : 0;
+  ctx.save(); ctx.translate(Math.sin(t * 90) * shake, Math.cos(t * 70) * shake);
+  // envelopes sliding away
+  withAlpha(1 - seg(t, a, a + .4), () => {
+    const r = rng(7);
+    for (let i = 0; i < 7; i++) { const px = 1380 + (r() - .5) * 360, py = 560 + (r() - .5) * 300, rot = (r() - .5) * .6;
+      envelope(px + eIn(seg(t, a, a + .4)) * 700, py, rot, '', C.red); }
+  });
+  const xs = [262, 682, 1102, 1522], rots = [-.05, .03, -.02, .045];
+  beats.forEach((bt, i) => {
+    const k = seg(t, bt - .1, bt + .45);
+    if (k <= 0) return;
+    billDoc(xs[i], lerp(1300, 505, eBack(k)), rots[i] * (2 - eOut(k)), 1, BILLS[i]);
+  });
+  // "THIS IS NOT A BILL"
+  const ks = seg(t, tStamp - .12, tStamp);
+  if (ks > 0) {
+    withAlpha(ks, () => stamp('THIS IS NOT A BILL', xs[3] - 20, 520, -.22, lerp(2.6, 1.1, eIn(ks)), C.red, 38));
+  }
+  ctx.restore();
+  const kq = seg(t, tStamp + .5, tStamp + 1.1);
+  riseText('4 senders · 4 formats · 0 straight answers', W / 2, 125, kq, { size: 40, weight: 600, align: 'center', color: C.amber });
+}
+
+// ---- s3: $4.9T, and the slice lost to complexity ----
+function sceneS3(t, a, b) {
+  const tWaste = wt('s3', 'and over');
+  const kIn = seg(t, a + .1, a + 1.2);
+  // big number
+  const val = lerp(0, 4.9, eOut(seg(t, a + .2, a + 1.8)));
+  withAlpha(eOut(kIn), () => {
+    text('U.S. HEALTH SPENDING, PER YEAR', 150, 285, { size: 22, weight: 700, color: C.fog, ls: 3 });
+    text('$' + val.toFixed(1) + ' trillion', 150, 405, { size: 120, weight: 700, fam: 'Fraunces', color: C.paper });
+    text('≈ 17.6% of GDP · CMS National Health Expenditures, 2023', 150, 455, { size: 24, weight: 500, color: C.fog });
+  });
+  const kW = seg(t, tWaste, tWaste + .8);
+  withAlpha(eOut(kW), () => {
+    text('LOST TO ADMINISTRATIVE COMPLEXITY', 150, 590, { size: 22, weight: 700, color: C.red, ls: 3 });
+    const v = Math.round(lerp(0, 265, eOut(seg(t, tWaste, tWaste + 1.4))));
+    text('$' + v + ' billion', 150 - (1 - eOut(kW)) * 40, 705, { size: 120, weight: 700, fam: 'Fraunces', color: C.red });
+    text('Billing, coding, prior auth & claims friction — every year', 150, 755, { size: 24, weight: 500, color: C.fog });
+    text('Estimate: Shrank, Rogstad & Parekh, JAMA 2019', 150, 790, { size: 20, weight: 500, color: C.fog, alpha: .7 });
+  });
+  // unit chart: 100 squares = $4.9T; ~5.4 squares = $265B
+  const gx = 1150, gy = 220, s = 54, g = 10;
+  for (let i = 0; i < 100; i++) {
+    const r = Math.floor(i / 10), c = i % 10;
+    const kk = eBack(seg(t, a + .15 + (r + c) * .045, a + .55 + (r + c) * .045));
+    if (kk <= 0) continue;
+    const x = gx + c * (s + g), y = gy + r * (s + g);
+    const cx = x + s / 2, cy = y + s / 2, ss = s * kk;
+    ctx.fillStyle = C.nightLine; rr(cx - ss / 2, cy - ss / 2, ss, ss, 8); ctx.fill();
+    const waste = i < 5 ? 1 : i === 5 ? .42 : 0;
+    const kr = eOut(seg(t, tWaste + .1 + i * .08, tWaste + .5 + i * .08));
+    if (waste && kr > 0) {
+      ctx.save(); rr(cx - ss / 2, cy - ss / 2, ss, ss, 8); ctx.clip();
+      const pulse = 1 + .08 * Math.sin((t - tWaste) * 6) * Math.exp(-(t - tWaste) * .8);
+      ctx.fillStyle = C.red; ctx.fillRect(cx - ss / 2, cy - ss / 2, ss * waste * kr * pulse, ss);
+      ctx.restore();
+    }
+  }
+  withAlpha(seg(t, a + 1, a + 1.6), () => {
+    text('each square ≈ $49 billion', gx, gy + 10 * (s + g) + 30, { size: 22, weight: 500, color: C.fog });
+  });
+}
+
+// ---- s4: three symptoms ----
+function panel(x, y, w, h, k, title, col) {
+  const yy = y + (1 - eOut(k)) * 60;
+  ctx.save(); ctx.globalAlpha *= eOut(k);
+  ctx.fillStyle = C.night2; rr(x, yy, w, h, 22); ctx.fill();
+  ctx.strokeStyle = C.nightLine; ctx.lineWidth = 2; ctx.stroke();
+  text(title, x + 36, yy + 58, { size: 20, weight: 700, color: col, ls: 3 });
+  ctx.restore();
+  return yy;
+}
+function sceneS4(t, a, b) {
+  const b1 = wt('s4', 'The same'), b2 = wt('s4', 'One in five'), b3 = wt('s4', 'A hundred');
+  const PW = 540, PH = 640, PY = 190, xs = [120, 690, 1260];
+  // A: price spread
+  let k = seg(t, b1 - .2, b1 + .5);
+  if (k > 0) {
+    const y = panel(xs[0], PY, PW, PH, k, 'SAME MRI · SAME CITY', C.amber);
+    const prices = [['Imaging center', 450], ['Hospital B', 980], ['Hospital C', 1650], ['Hospital D', 2900]];
+    prices.forEach(([n, p], i) => {
+      const kb = eOut(seg(t, b1 + .2 + i * .15, b1 + .9 + i * .15));
+      const by = y + 110 + i * 78;
+      text(n, xs[0] + 36, by, { size: 20, weight: 500, color: C.fogLight });
+      ctx.fillStyle = i === 3 ? C.red : i === 0 ? C.teal : '#56627E';
+      rr(xs[0] + 36, by + 12, 400 * p / 2900 * kb, 26, 6); ctx.fill();
+      text('$' + Math.round(p * kb).toLocaleString(), xs[0] + 36 + 400 * p / 2900 * kb + 12, by + 33, { size: 20, weight: 700, color: C.paper, alpha: kb });
+    });
+    withAlpha(seg(t, b1 + 1, b1 + 1.4), () => {
+      text('6×', xs[0] + 36, y + 505, { size: 96, weight: 700, fam: 'Fraunces', color: C.amber });
+      text('price gap for the', xs[0] + 60 + measure('6×', 96, 700, 'Fraunces'), y + 470, { size: 24, weight: 500, color: C.fogLight });
+      text('same scan', xs[0] + 60 + measure('6×', 96, 700, 'Fraunces'), y + 502, { size: 24, weight: 500, color: C.fogLight });
+      text('Illustrative prices; multi-fold local spreads are common', xs[0] + 36, y + 600, { size: 16, weight: 500, color: C.fog });
+    });
+  }
+  // B: 1 in 5 claims denied
+  k = seg(t, b2 - .2, b2 + .5);
+  if (k > 0) {
+    const y = panel(xs[1], PY, PW, PH, k, 'CLAIMS DENIED', C.red);
+    for (let i = 0; i < 5; i++) {
+      const kd = eBack(seg(t, b2 + i * .1, b2 + .45 + i * .1));
+      const cx = xs[1] + 78 + i * 96, cy = y + 250;
+      tr(cx, cy + (1 - kd) * 40, 0, kd, () => {
+        ctx.fillStyle = i === 2 ? '#3A2226' : '#222B40'; rr(-38, -60, 76, 120, 8); ctx.fill();
+        ctx.fillStyle = i === 2 ? '#6B3A3A' : '#3A4661';
+        for (let j = 0; j < 5; j++) { rr(-26, -42 + j * 16, j % 2 ? 36 : 52, 6, 3); ctx.fill(); }
+      });
+      if (i !== 2) checkMark(cx, cy + 90, 36, seg(t, b2 + .6 + i * .08, b2 + .9 + i * .08), C.teal, 5);
+    }
+    const kst = seg(t, b2 + .9, b2 + 1.05);
+    if (kst > 0) withAlpha(kst, () => stamp('DENIED', xs[1] + 270, y + 250, -.25, lerp(2, 1, eIn(kst)), C.red, 30));
+    withAlpha(seg(t, b2 + 1, b2 + 1.4), () => {
+      text('1 in 5', xs[1] + 36, y + 505, { size: 96, weight: 700, fam: 'Fraunces', color: C.red });
+      text('in-network claims', xs[1] + 60 + measure('1 in 5', 96, 700, 'Fraunces'), y + 470, { size: 24, weight: 500, color: C.fogLight });
+      text('denied', xs[1] + 60 + measure('1 in 5', 96, 700, 'Fraunces'), y + 502, { size: 24, weight: 500, color: C.fogLight });
+      text('HealthCare.gov insurers, 2023 · KFF', xs[1] + 36, y + 600, { size: 16, weight: 500, color: C.fog });
+    });
+  }
+  // C: 100M people with medical debt (330 dots ≈ U.S. population)
+  k = seg(t, b3 - .2, b3 + .5);
+  if (k > 0) {
+    const y = panel(xs[2], PY, PW, PH, k, 'CARRY MEDICAL DEBT', C.red);
+    const r = rng(42), debt = new Set();
+    while (debt.size < 100) debt.add(Math.floor(r() * 330));
+    for (let i = 0; i < 330; i++) {
+      const row = Math.floor(i / 22), col = i % 22;
+      const cx = xs[2] + 52 + col * 21.5, cy = y + 110 + row * 21.5;
+      const kd = seg(t, b3 + (col + row) * .012, b3 + .3 + (col + row) * .012);
+      const kr = seg(t, b3 + .5 + (i % 37) * .025, b3 + .8 + (i % 37) * .025);
+      ctx.fillStyle = debt.has(i) && kr > 0 ? mix('#3A4661', C.red, kr) : '#3A4661';
+      ctx.beginPath(); ctx.arc(cx, cy, 7 * eOut(kd), 0, 7); ctx.fill();
+    }
+    withAlpha(seg(t, b3 + 1, b3 + 1.4), () => {
+      text('100M', xs[2] + 36, y + 505, { size: 96, weight: 700, fam: 'Fraunces', color: C.red });
+      text('Americans', xs[2] + 60 + measure('100M', 96, 700, 'Fraunces'), y + 470, { size: 24, weight: 500, color: C.fogLight });
+      text('in medical debt', xs[2] + 60 + measure('100M', 96, 700, 'Fraunces'), y + 502, { size: 24, weight: 500, color: C.fogLight });
+      text('Each dot ≈ 1M people · KFF Health News / KFF, 2022', xs[2] + 36, y + 600, { size: 16, weight: 500, color: C.fog });
+    });
+  }
+}
+
+// ---- s5: the trust gap ----
+function sceneS5(t, a, b) {
+  const k0 = seg(t, a + .05, a + .7);
+  riseText('Trust in physicians', 150, 330, k0, { size: 76, weight: 700, fam: 'Fraunces', color: C.paper });
+  riseText('& hospitals', 150, 420, seg(t, a + .2, a + .9), { size: 76, weight: 700, fam: 'Fraunces', color: C.paper });
+  // chart
+  const x0 = 1000, x1 = 1640, yTop = 230, yBot = 790;
+  const Y = v => lerp(yBot, yTop, v / 100);
+  withAlpha(seg(t, a + .2, a + .8), () => {
+    ctx.strokeStyle = C.nightLine; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
+    [0, 25, 50, 75, 100].forEach(v => { ctx.beginPath(); ctx.moveTo(x0 - 60, Y(v)); ctx.lineTo(x1 + 60, Y(v)); ctx.stroke();
+      text(v + '%', x0 - 80, Y(v) + 7, { size: 18, weight: 500, color: C.fog, align: 'right' }); });
+    ctx.setLineDash([]);
+    text('Apr 2020', x0, yBot + 50, { size: 22, weight: 600, color: C.fogLight, align: 'center' });
+    text('Jan 2024', x1, yBot + 50, { size: 22, weight: 600, color: C.fogLight, align: 'center' });
+  });
+  const kL = eIO(seg(t, a + .8, a + 2.4));
+  const v0 = 71.5, v1 = 40.1;
+  if (kL > 0) {
+    ctx.strokeStyle = C.red; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, Y(v0)); ctx.lineTo(lerp(x0, x1, kL), Y(lerp(v0, v1, kL))); ctx.stroke();
+    ctx.fillStyle = C.paper; ctx.beginPath(); ctx.arc(x0, Y(v0), 14, 0, 7); ctx.fill();
+    text('71.5%', x0, Y(v0) - 34, { size: 44, weight: 700, color: C.paper, align: 'center' });
+    ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(lerp(x0, x1, kL), Y(lerp(v0, v1, kL)), 14, 0, 7); ctx.fill();
+    text(lerp(v0, v1, kL).toFixed(1) + '%', lerp(x0, x1, kL), Y(lerp(v0, v1, kL)) + 62, { size: 44, weight: 700, color: C.red, align: 'center' });
+  }
+  const kD = seg(t, a + 2.3, a + 2.9);
+  withAlpha(kD, () => {
+    text('−31', 150, 640 + (1 - eOut(kD)) * 30, { size: 170, weight: 700, fam: 'Fraunces', color: C.red });
+    text('points in under four years', 150, 700, { size: 32, weight: 500, color: C.fogLight });
+    text('Perlis et al., JAMA Network Open, 2024 · 50-state survey of U.S. adults', 150, 850, { size: 18, weight: 500, color: C.fog });
+  });
+}
+
+// ---- s6: the tangle → one straight line; dark → light ----
+const NODES = [['Insurer', 560, 300], ['PBM', 820, 720], ['Prior auth', 960, 330], ['Clearinghouse', 700, 520],
+  ['Billing vendor', 1150, 600], ['Collections', 1280, 330], ['Portal login', 1060, 820], ['Network rules', 1400, 740]];
+const PATHS = (() => { const r = rng(99), out = [];
+  for (let p = 0; p < 9; p++) {
+    const pts = [[330, 540]], n = 3 + Math.floor(r() * 3), used = new Set();
+    for (let j = 0; j < n; j++) { let q; do { q = Math.floor(r() * NODES.length); } while (used.has(q)); used.add(q); pts.push([NODES[q][1], NODES[q][2]]); }
+    pts.push([1590, 540]); out.push({ pts, off: (r() - .5) * 120 });
+  } return out; })();
+function flipK(t) { const f = wt('s6', 'So let'); return eIO(seg(t, f, f + .9)); }
+function sceneS6(t, a, b) {
+  const f = wt('s6', 'So let'), kStr = eIO(seg(t, f - .1, f + 1.0)), kF = flipK(t);
+  const ink = mix(C.paper, C.ink, kF);
+  // draw strands
+  PATHS.forEach((P, pi) => {
+    const kd = seg(t, a + pi * .07, a + 1.1 + pi * .07);
+    if (kd <= 0) return;
+    const pts = P.pts.map(([x, y], j) => { const xs = lerp(330, 1590, j / (P.pts.length - 1)); return [lerp(x, xs, kStr), lerp(y + (j && j < P.pts.length - 1 ? P.off : 0), 540, kStr)]; });
+    ctx.save();
+    ctx.strokeStyle = kStr > .95 ? C.teal : mix(pi % 3 ? '#56627E' : C.red, C.teal, kStr);
+    ctx.lineWidth = lerp(3, 10, kStr); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // dash-reveal
+    ctx.setLineDash([4000]); ctx.lineDashOffset = 4000 * (1 - eOut(kd));
+    ctx.beginPath(); ctx.moveTo(...pts[0]);
+    for (let j = 1; j < pts.length; j++) { const [px, py] = pts[j - 1], [qx, qy] = pts[j]; const mx = (px + qx) / 2;
+      ctx.bezierCurveTo(mx, py + (j % 2 ? -1 : 1) * 90 * (1 - kStr), mx, qy, qx, qy); }
+    ctx.stroke(); ctx.restore();
+  });
+  NODES.forEach(([n, x, y], i) => {
+    const kn = eBack(seg(t, a + .3 + i * .08, a + .7 + i * .08)) * (1 - eIn(seg(t, f - .2, f + .5)));
+    if (kn <= 0.01) return;
+    tr(x, y, 0, kn, () => {
+      const w = measure(n, 22, 600) + 36;
+      ctx.fillStyle = C.night2; rr(-w / 2, -24, w, 48, 24); ctx.fill();
+      ctx.strokeStyle = '#56627E'; ctx.lineWidth = 2; ctx.stroke();
+      text(n, 0, 8, { size: 22, weight: 600, color: C.fogLight, align: 'center' });
+    });
+  });
+  [['YOU', 330], ['CARE', 1590]].forEach(([n, x], i) => {
+    const kn = eBack(seg(t, a + i * .2, a + .5 + i * .2));
+    tr(x, 540, 0, kn, () => {
+      ctx.fillStyle = mix(C.paper, i ? C.teal : C.ink, kF); ctx.beginPath(); ctx.arc(0, 0, 70, 0, 7); ctx.fill();
+      text(n, 0, 10, { size: 28, weight: 800, color: mix(C.night, C.paper, kF), align: 'center', ls: 2 });
+    });
+  });
+  const t1 = wt('s6', "It's a design"), t2 = f;
+  withAlpha(1 - seg(t, t2 - .2, t2 + .2), () => {
+    riseText("This complexity isn't an accident.", W / 2, 150, seg(t, a + .1, a + .9), { size: 58, weight: 700, fam: 'Fraunces', align: 'center', color: C.paper });
+    riseText("It's a design.", W / 2, 900, seg(t, t1, t1 + .5), { size: 58, weight: 700, fam: 'Fraunces', align: 'center', color: C.red });
+  });
+  riseText("So let's redesign it.", W / 2, 260, seg(t, t2 + .75, t2 + 1.4), { size: 88, weight: 700, fam: 'Fraunces', align: 'center', color: ink });
+  withAlpha(seg(t, t2 + .9, t2 + 1.4), () => {
+    ['Know the price', 'One bill', 'No surprises'].forEach((s, i) => {
+      const x = lerp(330, 1590, (i + 1) / 4), kk = eBack(seg(t, t2 + 1 + i * .15, t2 + 1.4 + i * .15));
+      tr(x, 540, 0, kk, () => { ctx.fillStyle = C.paper; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fill();
+        ctx.strokeStyle = C.teal; ctx.lineWidth = 8; ctx.stroke(); });
+      text(s, x, 620, { size: 30, weight: 700, color: C.ink, align: 'center', alpha: kk > 0 ? 1 : 0 });
+    });
+  });
+}
+
+// ---- light-theme building blocks for the three fixes ----
+function fixHeader(t, a, num, title, bullets, beats) {
+  const k = seg(t, a + .05, a + .6);
+  withAlpha(eOut(k), () => {
+    ctx.fillStyle = C.teal; rr(150, 175, 130, 44, 22); ctx.fill();
+    text('FIX ' + num, 215, 205, { size: 20, weight: 800, color: '#fff', align: 'center', ls: 3 });
+  });
+  text(num, 150 - 20, 700, { size: 520, weight: 700, fam: 'Fraunces', color: '#EDE7DB', alpha: eOut(k) });
+  riseText(title, 150, 330, seg(t, a + .15, a + .9), { size: 100, weight: 700, fam: 'Fraunces', color: C.ink });
+  let y = 440;
+  bullets.forEach((bl, i) => {
+    const kb = seg(t, beats[i], beats[i] + .5);
+    const lines = wrap(bl, 760, 32, 500);
+    withAlpha(eOut(kb), () => {
+      ctx.fillStyle = C.teal; ctx.beginPath(); ctx.arc(162 - (1 - eOut(kb)) * 20, y - 10, 8, 0, 7); ctx.fill();
+      lines.forEach((ln, j) => text(ln, 190 - (1 - eOut(kb)) * 20, y + j * 44, { size: 32, weight: 500, color: C.inkSoft }));
+    });
+    y += lines.length * 44 + 34;
+  });
+}
+function card(x, y, w, h, r = 28) {
+  shadow(50, 20, 'rgba(17,24,39,.18)'); ctx.fillStyle = '#fff'; rr(x, y, w, h, r); ctx.fill(); noShadow();
+}
+function chip(label, x, y, bg, fg, size = 20) {
+  const w = measure(label, size, 700, 'Inter', 1) + 36;
+  ctx.fillStyle = bg; rr(x, y - size - 6, w, size + 22, (size + 22) / 2); ctx.fill();
+  text(label, x + 18, y + 4, { size, weight: 700, color: fg, ls: 1 });
+  return w;
+}
+
+// ---- s7: know the price ----
+const JSON_LINES = (() => { const r = rng(5), out = [];
+  for (let i = 0; i < 60; i++) {
+    const code = ['72148', '70450', '99285', '80053', '73721', '74177'][Math.floor(r() * 6)];
+    out.push(i % 4 === 0 ? '{"billing_code":"' + code + '",' : i % 4 === 1 ? ' "negotiated_rate":' + (200 + r() * 3000).toFixed(2) + ',' :
+      i % 4 === 2 ? ' "npi":[1' + Math.floor(r() * 1e9) + '],' : ' "arrangement":"ffs"},');
+  } return out; })();
+function sceneS7(t, a, b) {
+  const b1 = wt('s7', 'Enforce'), b2 = wt('s7', 'and turn'), b3 = wt('s7', 'one guaranteed');
+  fixHeader(t, a, '01', 'Know the price.', [
+    'Enforce the hospital & insurer price-transparency rules already on the books',
+    'Turn raw machine-readable price files into one all-in price',
+    'Make it a guaranteed quote — before care',
+  ], [b1, b2 + .3, b3]);
+  // phone
+  const kP = eOut(seg(t, a + .2, a + 1));
+  const px = 1170, py = 120 + (1 - kP) * 900, pw = 460, ph = 840;
+  shadow(60, 30, 'rgba(17,24,39,.3)'); ctx.fillStyle = C.ink; rr(px, py, pw, ph, 64); ctx.fill(); noShadow();
+  ctx.save(); rr(px + 16, py + 16, pw - 32, ph - 32, 50); ctx.clip();
+  ctx.fillStyle = '#F7F5F0'; ctx.fillRect(px, py, pw, ph);
+  const kClean = eIO(seg(t, b2 + .4, b2 + 1.3));
+  // raw MRF scroll
+  withAlpha(1 - kClean, () => {
+    ctx.fillStyle = '#0B1020'; ctx.fillRect(px, py, pw, ph);
+    const off = (t - a) * 120;
+    JSON_LINES.forEach((ln, i) => {
+      const yy = py + 90 + i * 30 - off % 1200;
+      if (yy < py || yy > py + ph) return;
+      text(ln, px + 40, yy, { size: 16, fam: 'Mono', color: i % 4 === 1 ? C.amber : '#7C8AAE' });
+    });
+    ctx.fillStyle = 'rgba(11,16,32,.85)'; ctx.fillRect(px, py + ph - 150, pw, 150);
+    text('in-network-rates.json', px + 40, py + ph - 90, { size: 20, fam: 'Mono', weight: 600, color: '#fff' });
+    text('48.3 GB · updated monthly', px + 40, py + ph - 60, { size: 18, fam: 'Mono', color: C.fog });
+  });
+  withAlpha(kClean, () => {
+    const oy = (1 - kClean) * 60;
+    text('9:41', px + 60, py + 62, { size: 18, weight: 700, color: C.ink });
+    text('Lumbar spine MRI', px + 40, py + 140 + oy, { size: 30, weight: 700, color: C.ink });
+    text('CPT 72148 · near 60614', px + 40, py + 175 + oy, { size: 18, weight: 500, color: C.fog });
+    text('OTHER NEARBY OPTIONS', px + 40, py + 572 + oy, { size: 15, weight: 700, color: C.fog, ls: 2 });
+    const items = [['Riverside Imaging', '$640', true], ['County General', '$1,650', false], ['Hillview Hospital', '$2,900', false]];
+    items.forEach(([n, p, best], i) => {
+      const ki = eOut(seg(t, b2 + .9 + i * .15, b2 + 1.4 + i * .15)), y = py + [215, 700, 810][i] + (1 - ki) * 40;
+      withAlpha(ki, () => {
+        if (best) {
+          ctx.fillStyle = '#fff'; shadow(24, 8, 'rgba(17,24,39,.12)'); rr(px + 32, y, pw - 64, 290, 22); ctx.fill(); noShadow();
+          ctx.strokeStyle = C.teal; ctx.lineWidth = 3; ctx.stroke();
+          text(n, px + 60, y + 50, { size: 22, weight: 600, color: C.inkSoft });
+          text(p, px + 60, y + 130, { size: 76, weight: 700, fam: 'Fraunces', color: C.ink });
+          text('all-in · facility + radiologist', px + 60, y + 168, { size: 18, weight: 500, color: C.fog });
+          const kg = eBack(seg(t, b3 + .1, b3 + .5));
+          tr(px + 60, y + 238, 0, 1, () => { if (kg > 0) { ctx.save(); ctx.scale(kg, kg); chip('✓ GUARANTEED · YOU PAY $210', 0, 0, C.teal, '#fff', 18); ctx.restore(); } });
+        } else {
+          ctx.fillStyle = '#fff'; rr(px + 32, y - 100, pw - 64, 90, 18); ctx.fill();
+          text(n, px + 60, y - 45, { size: 22, weight: 600, color: C.inkSoft });
+          text(p, px + pw - 60, y - 45, { size: 26, weight: 700, color: C.ink, align: 'right' });
+        }
+      });
+    });
+  });
+  ctx.restore();
+  ctx.fillStyle = C.ink; rr(px + pw / 2 - 70, py + 28, 140, 32, 16); ctx.fill();
+}
+
+// ---- s8: one bill ----
+function sceneS8(t, a, b) {
+  const b1 = wt('s8', 'Plain'), b2 = wt('s8', 'settled'), b3 = wt('s8', 'like swiping');
+  fixHeader(t, a, '02', 'One bill.', [
+    'One plain-language bill per visit — every provider, one statement',
+    'Claims settled in real time at checkout',
+    'One standard format across every payer',
+  ], [b1, b2, b3 + .3]);
+  const cx = 1400, cy = 520;
+  const kM = eIO(seg(t, a + .2, b1 + .6));
+  // four messy bills converge and collapse
+  const starts = [[1200, 250, -.3], [1650, 300, .25], [1180, 820, .2], [1680, 800, -.25]];
+  starts.forEach(([x, y, r], i) => {
+    const kk = seg(t, a + i * .06, a + .3 + i * .06);
+    withAlpha(eOut(kk) * (1 - seg(kM, .75, 1)), () => billDoc(lerp(x, cx, kM), lerp(y, cy, kM), r * (1 - kM), lerp(.55, .3, kM), BILLS[i]));
+  });
+  const kC = eBack(seg(t, b1 + .35, b1 + .85));
+  if (kC > 0) tr(cx, cy, 0, kC, () => {
+    const w = 540, h = 680, x = -w / 2, y = -h / 2;
+    card(x, y, w, h);
+    text('YOUR VISIT · MAR 12', x + 44, y + 64, { size: 18, weight: 700, color: C.fog, ls: 2 });
+    text('Lumbar spine MRI', x + 44, y + 112, { size: 34, weight: 700, color: C.ink });
+    const rows = [['Imaging center', '$470'], ['Radiologist', '$170']];
+    rows.forEach(([n, v], i) => { text(n, x + 44, y + 185 + i * 50, { size: 24, weight: 500, color: C.inkSoft }); text(v, x + w - 44, y + 185 + i * 50, { size: 24, weight: 600, color: C.ink, align: 'right' }); });
+    ctx.fillStyle = C.paper2; ctx.fillRect(x + 44, y + 260, w - 88, 2);
+    [['Total', '$640'], ['Your plan paid', '−$430']].forEach(([n, v], i) => { text(n, x + 44, y + 310 + i * 50, { size: 24, weight: 600, color: C.inkSoft }); text(v, x + w - 44, y + 310 + i * 50, { size: 24, weight: 700, color: C.ink, align: 'right' }); });
+    ctx.fillStyle = '#EEF8F5'; rr(x + 28, y + 400, w - 56, 120, 18); ctx.fill();
+    text('You owe', x + 56, y + 472, { size: 28, weight: 700, color: C.tealDeep });
+    text('$210', x + w - 56, y + 482, { size: 60, weight: 700, fam: 'Fraunces', color: C.ink, align: 'right' });
+    text('✓ Matches your quote', x + 44, y + 568, { size: 22, weight: 700, color: C.tealDeep });
+    // settled
+    const kS = seg(t, b3 + .1, b3 + .7);
+    if (kS > 0) {
+      // card swipe
+      const sx = lerp(-420, 420, eIO(kS));
+      withAlpha(1 - seg(kS, .8, 1), () => { ctx.fillStyle = C.ink; rr(sx - 120, y + h - 100, 240, 150, 18); ctx.fill();
+        ctx.fillStyle = C.amber; rr(sx - 90, y + h - 60, 50, 38, 6); ctx.fill(); });
+      const kSt = eBack(seg(t, b3 + .6, b3 + 1));
+      if (kSt > 0) stamp('PAID · SETTLED AT CHECKOUT', 0, y + h - 30, -.06, kSt, C.tealDeep, 24);
+    }
+  });
+}
+
+// ---- s9: no surprises ----
+function shieldPath(s) {
+  ctx.beginPath(); ctx.moveTo(0, -s); ctx.bezierCurveTo(s * .55, -s * .72, s * .8, -s * .75, s * .85, -s * .7);
+  ctx.bezierCurveTo(s * .9, s * .1, s * .6, s * .7, 0, s); ctx.bezierCurveTo(-s * .6, s * .7, -s * .9, s * .1, -s * .85, -s * .7);
+  ctx.bezierCurveTo(-s * .8, -s * .75, -s * .55, -s * .72, 0, -s); ctx.closePath();
+}
+function sceneS9(t, a, b) {
+  const beats = [wt('s9', 'Automate'), wt('s9', 'screen'), wt('s9', 'and never')];
+  fixHeader(t, a, '03', 'No surprises.', [], []);
+  // shield
+  const kS = eBack(seg(t, a + .3, a + .9));
+  tr(430, 690, 0, kS, () => {
+    shadow(40, 16, 'rgba(11,140,119,.35)'); ctx.fillStyle = C.teal; shieldPath(180); ctx.fill(); noShadow();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 6; ctx.save(); ctx.scale(.84, .84); shieldPath(180); ctx.stroke(); ctx.restore();
+    checkMark(0, 10, 150, seg(t, beats[2] + 1.2, beats[2] + 1.7), '#fff', 20);
+  });
+  const rows = [
+    ['Automated prior authorization', 'Standard APIs & fast deadlines for insurers (CMS-0057-F, 2026–27)'],
+    ['Financial-aid screening first', 'Every patient checked for assistance before any bill goes to collections'],
+    ['The quote is the ceiling', 'Extend No Surprises Act protections: never owe more than you were quoted'],
+  ];
+  rows.forEach(([h, s], i) => {
+    const k = seg(t, beats[i] - .15, beats[i] + .4), x = 880, y = 190 + i * 235;
+    withAlpha(eOut(k), () => {
+      tr((1 - eOut(k)) * 80, 0, 0, 1, () => {
+        card(x, y, 900, 200, 26);
+        ctx.fillStyle = '#EEF8F5'; ctx.beginPath(); ctx.arc(x + 95, y + 100, 48, 0, 7); ctx.fill();
+        ctx.strokeStyle = C.teal; ctx.lineWidth = 4; ctx.stroke();
+        checkMark(x + 95, y + 102, 56, seg(t, beats[i] + .3, beats[i] + .7), C.tealDeep, 8);
+        text(h, x + 180, y + 88, { size: 36, weight: 700, color: C.ink });
+        wrap(s, 670, 22, 500).forEach((ln, j) => text(ln, x + 180, y + 128 + j * 32, { size: 22, weight: 500, color: C.inkSoft }));
+      });
+    });
+  });
+}
+
+// ---- s10: end card ----
+function iconTag(s) { ctx.beginPath(); ctx.moveTo(-s, -s * .45); ctx.lineTo(s * .35, -s * .45); ctx.lineTo(s, 0); ctx.lineTo(s * .35, s * .45); ctx.lineTo(-s, s * .45); ctx.closePath(); }
+function sceneS10(t, a, b) {
+  const beats = [wt('s10', 'A price'), wt('s10', 'A bill'), wt('s10', 'A system')];
+  const kQ = seg(t, a + .05, a + .7);
+  riseText('How do we rebuild trust in U.S. health care?', W / 2, 190, kQ, { size: 40, weight: 600, align: 'center', color: C.inkSoft });
+  const items = [['A price you can see.', 'tag'], ['A bill you can read.', 'bill'], ['A system you can trust.', 'shield']];
+  items.forEach(([s, ic], i) => {
+    const x = 400 + i * 560, k = seg(t, beats[i] - .1, beats[i] + .5), ke = eBack(k);
+    if (k <= 0) return;
+    tr(x, 470, 0, ke, () => {
+      ctx.fillStyle = i === 2 ? C.teal : C.ink; ctx.beginPath(); ctx.arc(0, 0, 120, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 8;
+      if (ic === 'tag') { iconTag(62); ctx.fill(); ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(-38, 0, 10, 0, 7); ctx.fill();
+        text('$', 8, 16, { size: 44, weight: 800, color: C.ink, align: 'center' }); }
+      if (ic === 'bill') { rr(-44, -58, 88, 116, 8); ctx.fill(); ctx.fillStyle = C.fogLight; for (let j = 0; j < 3; j++) { rr(-28, -36 + j * 20, 56, 8, 4); ctx.fill(); }
+        checkMark(0, 32, 40, seg(t, beats[1] + .3, beats[1] + .7), C.teal, 8); }
+      if (ic === 'shield') { ctx.save(); ctx.scale(.6, .6); shieldPath(100); ctx.fill(); ctx.restore(); checkMark(0, 4, 48, seg(t, beats[2] + .3, beats[2] + .8), C.teal, 9); }
+    });
+    text(s, x, 680, { size: 40, weight: 700, fam: 'Fraunces', color: C.ink, align: 'center', alpha: eOut(k) });
+  });
+  const kT = seg(t, beats[2] + .8, beats[2] + 1.4);
+  withAlpha(eOut(kT), () => {
+    text('Make it simple enough to trust.', W / 2, 850, { size: 64, weight: 700, fam: 'Fraunces', color: C.tealDeep, align: 'center' });
+  });
+}
+
+// ============================================================
+//   GLOBAL LAYERS
+// ============================================================
+const SCENES = { s1: sceneS1, s2: sceneS2, s3: sceneS3, s4: sceneS4, s5: sceneS5, s6: sceneS6, s7: sceneS7, s8: sceneS8, s9: sceneS9, s10: sceneS10 };
+const CHAPTERS = [['s1', 'THE BILL'], ['s3', 'THE COST'], ['s4', 'THE SYMPTOMS'], ['s5', 'THE TRUST GAP'], ['s6', 'THE REDESIGN']];
+
+function background(t) {
+  const f = wt('s6', 'So let');
+  ctx.fillStyle = C.night; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 1200);
+  g.addColorStop(0, 'rgba(76,125,255,0.06)'); g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const k = eIO(seg(t, f, f + .9));
+  if (k > 0) {
+    ctx.save(); ctx.beginPath(); ctx.arc(1590, 540, 2300 * k, 0, 7); ctx.clip();
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+}
+function isLight(t) { return t > wt('s6', 'So let') + .6; }
+
+function captions(t) {
+  for (const s of TIMING.scenes) for (const [c0, c1, str] of s.caps) {
+    if (t < c0 - .05 || t > c1 + .1) continue;
+    const k = Math.min(seg(t, c0 - .05, c0 + .1), 1 - seg(t, c1, c1 + .1));
+    const size = 30, w = measure(str, size, 600) + 48;
+    withAlpha(k, () => {
+      ctx.fillStyle = 'rgba(8,11,20,.78)'; rr(W / 2 - w / 2, 985, w, 56, 14); ctx.fill();
+      text(str, W / 2, 1022, { size, weight: 600, color: '#fff', align: 'center' });
+    });
+  }
+}
+function chrome(t) {
+  const light = isLight(t);
+  let ch = CHAPTERS[0][1];
+  for (const [id, n] of CHAPTERS) if (t >= win(id)[0]) ch = n;
+  const col = light ? C.inkSoft : C.fog;
+  ctx.fillStyle = light ? C.tealDeep : C.red; ctx.beginPath(); ctx.arc(64, 62, 7, 0, 7); ctx.fill();
+  text(ch, 84, 70, { size: 18, weight: 700, color: col, ls: 3 });
+  text('SIMPLE ENOUGH TO TRUST', W - 60, 70, { size: 18, weight: 700, color: col, ls: 3, align: 'right', alpha: .7 });
+  ctx.fillStyle = light ? 'rgba(17,24,39,.08)' : 'rgba(255,255,255,.08)'; ctx.fillRect(0, H - 6, W, 6);
+  ctx.fillStyle = light ? C.teal : C.red; ctx.fillRect(0, H - 6, W * t / TIMING.total, 6);
+}
+
+function render(t) {
+  ctx.save();
+  background(t);
+  for (const id in SCENES) {
+    const [a, b] = win(id);
+    const isLast = id === 's10';
+    if (t < a - .01 || t > b + .35) continue;
+    const alpha = Math.min(id === 's1' ? 1 : seg(t, a - .05, a + .3), isLast ? 1 : 1 - seg(t, b, b + .35));
+    withAlpha(alpha, () => SCENES[id](t, a, b));
+  }
+  chrome(t);
+  captions(t);
+  // opening/closing fades
+  const fo = Math.max(1 - seg(t, 0, .35), seg(t, TIMING.total - .45, TIMING.total));
+  if (fo > 0) { ctx.fillStyle = `rgba(0,0,0,${fo})`; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+}
+window.render = render;
+window.ready = document.fonts.ready.then(() => Promise.all(
+  ['400 20px Inter', '500 20px Inter', '600 20px Inter', '700 20px Inter', '800 20px Inter', '600 20px Fraunces', '700 20px Fraunces', '400 20px Mono', '600 20px Mono']
+    .map(f => document.fonts.load(f)))).then(() => true);
+const q = new URLSearchParams(location.search).get('t');
+window.ready.then(() => render(q ? +q : 12));
+</script>
+</body>
+</html>
