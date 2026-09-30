@@ -15,13 +15,13 @@ The video tells the story through its design. The first half is dark, cluttered 
 |---|---|---|---|
 | 0:00 | Hook | Envelopes rain onto the screen ("PAST DUE", "FINAL NOTICE") | You got care. Then came the envelopes. |
 | 0:03 | Four bills | Hospital, physician and lab bills and an EOB, full of CPT/REV/CARC codes; a stamp lands: THIS IS NOT A BILL | A hospital bill. A doctor bill. A lab bill. And a letter that says: this is not a bill. |
-| 0:09 | The cost | $4.9T counter; a 100-square unit chart in which 5.4 squares turn red ($265B) | ~$5T a year; over $250B lost to administrative complexity. |
-| 0:15 | Symptoms | Three panels: 6× MRI price spread · 1 in 5 claims denied · 100 of 330 dots = medical debt | Same scan costs several times more… one in five… a hundred million… |
-| 0:24 | Trust gap | Slope chart 71.5% → 40.1%, −31 pts | Trust fell from 72 to 40 percent in under four years. |
+| 0:09 | The cost | $4.9T counter; a 100-square unit chart in which 5.4 squares turn red ($265B) | Nearly $5T a year, and over $250B lost to administrative complexity. |
+| 0:15 | Symptoms | Three panels: 6× MRI price spread · 1 in 5 claims denied · 100 of 330 dots = medical debt | Same scan, six times more… one in five claims denied… a hundred million in debt… |
+| 0:24 | Trust gap | Slope chart 71.5% → 40.1%, −31 pts | Trust in doctors and hospitals fell from 72 percent to 40. |
 | 0:29 | Pivot | Nine tangled strands through Insurer / PBM / Prior auth / Collections… straighten into one teal line; dark → light wipe | This complexity isn't an accident. It's a design. So let's redesign it. |
-| 0:33 | Fix 01: Know the price | Phone: a 48 GB machine-readable JSON file resolves into a $640 all-in guaranteed quote with alternatives | Enforce transparency laws; turn raw price files into one guaranteed, all-in price before care. |
-| 0:42 | Fix 02: One bill | The four messy bills collapse into one plain-language statement ($210 owed, matches quote); a card swipe gives PAID · SETTLED AT CHECKOUT | One bill, plain language, settled in real time. |
-| 0:47 | Fix 03: No surprises | Shield plus three checked commitments | Automate prior auth, screen for financial aid before collections, never charge more than the quote. |
+| 0:33 | Fix 01: Know the price | Phone: a 48 GB machine-readable JSON file resolves into a $640 all-in guaranteed quote with alternatives | Enforce the transparency laws we already have, and guarantee an all-in price before care. |
+| 0:42 | Fix 02: One bill | The four messy bills collapse into one plain-language statement ($210 owed, matches quote); a card swipe gives PAID · SETTLED AT CHECKOUT | One bill. In plain language, settled at checkout, like swiping a card. |
+| 0:47 | Fix 03: No surprises | Shield plus three checked commitments | Automate prior authorization, screen for financial aid before collections, and never charge more than the quote. |
 | 0:55 | Close | Price tag · bill · shield, then "Make it simple enough to trust." | A price you can see. A bill you can read. A system you can trust. |
 
 ## Policy grounding
@@ -38,7 +38,7 @@ The video tells the story through its design. The first half is dark, cluttered 
 - MRI price bars and the $640/$210 example are **illustrative** and labelled as such on screen.
 
 ## How it was made (fully reproducible, no stock assets)
-- `src/vo.json`: script. The voice is Piper neural TTS (`en_US-lessac-high`), generated locally.
+- `src/vo.json`: script. `src/tts.py` voices it with Kokoro-82M (Apache-2.0, voice `af_heart`) at natural speed (about 150 wpm, with pauses between lines). It is processed through a light vocal chain (rumble cut, gentle compression, a little warmth and air) with no saturation, and the music ducks about 9 dB under speech.
 - `src/timing.py`: lays the VO clips onto the 60 s timeline and writes `timing.js` (scene starts and caption cues). Animations are keyed to the moment each phrase is spoken.
 - `src/index.html`: every illustration, chart and motion curve is hand-drawn in Canvas 2D. `render(t)` is a pure function of time. Fonts: Fraunces, Inter, JetBrains Mono (OFL).
 - `src/audio.py`: synthesized score (Am–F–Dm–E pads with a heartbeat, then Cmaj7–F–G–Am with plucked arpeggios), SFX (whooshes, stamp hits, chimes), sidechain ducking under VO, loudness normalization.

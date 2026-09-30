@@ -1,10 +1,10 @@
 """Lay out VO clips on the 60s timeline and emit timing.js for the renderer."""
 import json, re, wave
 vo = json.load(open('src/vo.json'))
-GAP = {'s6': 0.45, 's7': 0.3, 's10': 0.4}
+GAP = {'s6': 0.6, 's7': 0.45, 's10': 0.5}
 t, scenes = 0.25, []
 for k, text in vo:
-    t += GAP.get(k, 0.2) if scenes else 0
+    t += GAP.get(k, 0.3) if scenes else 0
     w = wave.open(f'audio/{k}.wav'); d = w.getnframes() / w.getframerate()
     # captions: split on sentence/colon boundaries, time ∝ characters
     parts = []

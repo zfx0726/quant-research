@@ -4,214 +4,214 @@ window.TIMING={
   {
    "id": "s1",
    "start": 0.25,
-   "dur": 2.484,
+   "dur": 2.141,
    "caps": [
     [
      0.25,
-     1.123,
+     1.002,
      "You got care."
     ],
     [
-     1.123,
-     2.734,
+     1.002,
+     2.391,
      "Then came the envelopes."
     ]
    ]
   },
   {
    "id": "s2",
-   "start": 2.934,
-   "dur": 5.547,
+   "start": 2.691,
+   "dur": 5.137,
    "caps": [
     [
-     2.934,
-     4.003,
+     2.691,
+     3.681,
      "A hospital bill."
     ],
     [
-     4.003,
-     4.938,
+     3.681,
+     4.548,
      "A doctor bill."
     ],
     [
-     4.938,
-     5.674,
+     4.548,
+     5.229,
      "A lab bill."
     ],
     [
-     5.674,
-     7.211,
+     5.229,
+     6.652,
      "And a letter that says:"
     ],
     [
-     7.211,
-     8.48,
+     6.652,
+     7.828,
      "this is not a bill."
     ]
    ]
   },
   {
    "id": "s3",
-   "start": 8.68,
-   "dur": 6.385,
+   "start": 8.128,
+   "dur": 7.184,
    "caps": [
     [
-     8.68,
-     11.556,
-     "We spend about five trillion dollars a year on health care,"
+     8.128,
+     11.469,
+     "We spend nearly five trillion dollars a year on health care,"
     ],
     [
-     11.556,
-     15.066,
-     "and over two hundred fifty billion is lost to administrative complexity."
+     11.469,
+     15.312,
+     "and lose over two hundred fifty billion to administrative complexity."
     ]
    ]
   },
   {
    "id": "s4",
-   "start": 15.266,
-   "dur": 8.392,
+   "start": 15.612,
+   "dur": 8.136,
    "caps": [
     [
-     15.266,
-     18.177,
-     "The same scan costs several times more across town."
+     15.612,
+     18.867,
+     "The same scan can cost six times more across town."
     ],
     [
-     18.177,
-     21.146,
-     "One in five in-network marketplace claims is denied."
+     18.867,
+     20.884,
+     "One in five claims gets denied."
     ],
     [
-     21.146,
-     23.658,
+     20.884,
+     23.748,
      "A hundred million people carry medical debt."
     ]
    ]
   },
   {
    "id": "s5",
-   "start": 23.858,
-   "dur": 4.644,
+   "start": 24.048,
+   "dur": 4.651,
    "caps": [
     [
-     23.858,
-     28.502,
-     "Trust in doctors and hospitals fell from seventy-two to forty percent in under four years."
+     24.048,
+     28.101,
+     "Trust in doctors and hospitals fell from seventy-two percent,"
+    ],
+    [
+     28.101,
+     28.699,
+     "to forty."
     ]
    ]
   },
   {
    "id": "s6",
-   "start": 28.952,
-   "dur": 4.201,
+   "start": 29.299,
+   "dur": 4.436,
    "caps": [
     [
-     28.952,
-     31.022,
+     29.299,
+     31.485,
      "This complexity isn't an accident."
     ],
     [
-     31.022,
-     31.874,
+     31.485,
+     32.385,
      "It's a design."
     ],
     [
-     31.874,
-     33.153,
+     32.385,
+     33.735,
      "So let's redesign it."
     ]
    ]
   },
   {
    "id": "s7",
-   "start": 33.453,
-   "dur": 8.416,
+   "start": 34.185,
+   "dur": 6.77,
    "caps": [
     [
-     33.453,
-     34.69,
+     34.185,
+     35.439,
      "One: know the price."
     ],
     [
-     34.69,
-     37.537,
+     35.439,
+     38.322,
      "Enforce the transparency laws we already have,"
     ],
     [
-     37.537,
-     40.322,
-     "and turn raw price files into one guaranteed,"
-    ],
-    [
-     40.322,
-     41.869,
-     "all-in price before care."
+     38.322,
+     40.955,
+     "and guarantee an all-in price before care."
     ]
    ]
   },
   {
    "id": "s8",
-   "start": 42.069,
-   "dur": 4.666,
+   "start": 41.255,
+   "dur": 4.534,
    "caps": [
     [
-     42.069,
-     42.976,
+     41.255,
+     42.112,
      "Two: one bill."
     ],
     [
-     42.976,
-     46.735,
-     "Plain language, settled in real time, like swiping a card."
+     42.112,
+     45.788,
+     "In plain language, settled at checkout, like swiping a card."
     ]
    ]
   },
   {
    "id": "s9",
-   "start": 46.935,
-   "dur": 7.755,
+   "start": 46.088,
+   "dur": 8.243,
    "caps": [
     [
-     46.935,
-     48.051,
+     46.088,
+     47.357,
      "Three: no surprises."
     ],
     [
-     48.051,
-     49.669,
+     47.357,
+     49.196,
      "Automate prior authorization,"
     ],
     [
-     49.669,
-     52.626,
-     "screen everyone for financial aid before collections,"
+     49.196,
+     51.986,
+     "screen for financial aid before collections,"
     ],
     [
-     52.626,
-     54.69,
+     51.986,
+     54.332,
      "and never charge more than the quote."
     ]
    ]
   },
   {
    "id": "s10",
-   "start": 55.09,
-   "dur": 4.085,
+   "start": 54.832,
+   "dur": 3.858,
    "caps": [
     [
-     55.09,
-     56.387,
+     54.832,
+     56.057,
      "A price you can see."
     ],
     [
-     56.387,
-     57.683,
+     56.057,
+     57.281,
      "A bill you can read."
     ],
     [
-     57.683,
-     59.175,
+     57.281,
+     58.69,
      "A system you can trust."
     ]
    ]

@@ -10,8 +10,8 @@ TXT = {s['id']: ' '.join(c[2] for c in s['caps']) for s in tl['scenes']}
 def wt(i, sub): s = SC[i]; return s['start'] + s['dur'] * TXT[i].index(sub) / len(TXT[i])
 FLIP = wt('s6', 'So let')
 
-def load(path):
-    raw = subprocess.run([FF, '-v', 'error', '-i', path, '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
+def load(path, af=None):
+    raw = subprocess.run([FF, '-v', 'error', '-i', path] + (['-af', af] if af else []) + [ '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
     return np.frombuffer(raw, np.float32).astype(np.float64)
 def place(buf, x, t0, g=1.0):
     i = int(t0 * SR); x = x[:max(0, len(buf) - i)]; buf[i:i + len(x)] += g * x
@@ -101,16 +101,21 @@ place(sfx, chime(midi(84), .12), wt('s10', 'A system') + .85)
 
 # --- voiceover ---
 vo = np.zeros(N)
-for s in tl['scenes']: place(vo, load(f"audio/{s['id']}.wav"), s['start'])
-vo = lp(vo, 9000); vo = vo / np.max(np.abs(vo)) * .85
+# gentle, transparent vocal chain: rumble cut, soft-knee compression, a touch of warmth + air.
+# (No low-pass or saturation: keep the voice clean and open.)
+VO_FX = ('highpass=f=75,acompressor=threshold=-20dB:ratio=2.2:attack=15:release=180:knee=6,'
+         'equalizer=f=180:t=q:w=1:g=1.5,equalizer=f=3200:t=q:w=1.2:g=-1,equalizer=f=9000:t=h:w=2000:g=1.5,'
+         'aresample=resampler=soxr')
+for s in tl['scenes']: place(vo, load(f"audio/{s['id']}.wav", VO_FX), s['start'])
+vo = vo / np.max(np.abs(vo)) * .8
 # sidechain duck the music under VO
 e = np.convolve(np.abs(vo), np.ones(int(.05 * SR)) / int(.05 * SR), 'same')
-duck = 1 - .55 * np.clip(e / .05, 0, 1)
+duck = 1 - .65 * np.clip(e / .04, 0, 1)
 duck = np.convolve(duck, np.ones(int(.25 * SR)) / int(.25 * SR), 'same')
 music[:, 0] = lp(music[:, 0], 7000) * duck; music[:, 1] = lp(music[:, 1], 7000) * duck
 mix = music * 1.0 + (vo + sfx)[:, None] * np.array([1, 1])
 mix *= env(N, .05, 1.2)[:, None]
-mix = np.tanh(mix * 1.1) / np.tanh(1.1)
+mix = mix / max(1.0, np.max(np.abs(mix)) / .9)  # clean peak normalize, no saturation
 pcm = (np.clip(mix, -1, 1) * 32767).astype('<i2').tobytes()
 subprocess.run([FF, '-y', '-v', 'error', '-f', 's16le', '-ar', str(SR), '-ac', '2', '-i', '-', '-af', 'loudnorm=I=-15:TP=-1.5:LRA=11', '-ar', str(SR), 'audio/mix.wav'], input=pcm, check=True)
 print('mix written; flip at', round(FLIP, 2))

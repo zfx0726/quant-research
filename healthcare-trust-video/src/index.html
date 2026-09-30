@@ -233,7 +233,7 @@ function sceneS2(t, a, b) {
 
 // ---- s3: $4.9T, and the slice lost to complexity ----
 function sceneS3(t, a, b) {
-  const tWaste = wt('s3', 'and over');
+  const tWaste = wt('s3', 'and lose');
   const kIn = seg(t, a + .1, a + 1.2);
   // big number
   const val = lerp(0, 4.9, eOut(seg(t, a + .2, a + 1.8)));
@@ -485,7 +485,7 @@ const JSON_LINES = (() => { const r = rng(5), out = [];
       i % 4 === 2 ? ' "npi":[1' + Math.floor(r() * 1e9) + '],' : ' "arrangement":"ffs"},');
   } return out; })();
 function sceneS7(t, a, b) {
-  const b1 = wt('s7', 'Enforce'), b2 = wt('s7', 'and turn'), b3 = wt('s7', 'one guaranteed');
+  const b1 = wt('s7', 'Enforce'), b2 = wt('s7', 'and guarantee'), b3 = wt('s7', 'all-in price');
   fixHeader(t, a, '01', 'Know the price.', [
     'Enforce the hospital & insurer price-transparency rules already on the books',
     'Turn raw machine-readable price files into one all-in price',
@@ -543,7 +543,7 @@ function sceneS7(t, a, b) {
 
 // ---- s8: one bill ----
 function sceneS8(t, a, b) {
-  const b1 = wt('s8', 'Plain'), b2 = wt('s8', 'settled'), b3 = wt('s8', 'like swiping');
+  const b1 = wt('s8', 'In plain'), b2 = wt('s8', 'settled'), b3 = wt('s8', 'like swiping');
   fixHeader(t, a, '02', 'One bill.', [
     'One plain-language bill per visit — every provider, one statement',
     'Claims settled in real time at checkout',
